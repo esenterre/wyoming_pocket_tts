@@ -33,21 +33,17 @@ COPY wyoming_pocket_tts/ wyoming_pocket_tts/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --no-deps .
 
-# Clean up: remove unneeded runtime packages and files in a single layer
-# Note: sympy MUST be kept - torch 2.12 imports it at load time via
-# torch._dynamo (ModuleNotFoundError: No module named 'sympy' otherwise).
-RUN rm -rf /usr/local/lib/python3.13/site-packages/networkx \
-           /usr/local/lib/python3.13/site-packages/networkx-*.dist-info \
-           /usr/local/lib/python3.13/site-packages/pygments \
-           /usr/local/lib/python3.13/site-packages/Pygments-*.dist-info \
-           /usr/local/lib/python3.13/site-packages/pip \
+# Clean up dead weight in a single layer.
+# IMPORTANT: only pip/setuptools (build-time) and torch headers/assets are
+# removed. sympy, networkx, pygments, torch/_inductor, caffe2, ... MUST stay:
+# torch 2.12 pulls them all in at import time via torch._dynamo, and deleting
+# them breaks startup (ModuleNotFoundError: 'sympy' then 'torch._inductor').
+RUN rm -rf /usr/local/lib/python3.13/site-packages/pip \
            /usr/local/lib/python3.13/site-packages/pip-*.dist-info \
            /usr/local/lib/python3.13/site-packages/setuptools \
            /usr/local/lib/python3.13/site-packages/setuptools-*.dist-info \
            /usr/local/lib/python3.13/site-packages/torch/include \
            /usr/local/lib/python3.13/site-packages/torch/share \
-           /usr/local/lib/python3.13/site-packages/torch/_inductor \
-           /usr/local/lib/python3.13/site-packages/caffe2 \
     && find /usr/local/lib/python3.13/site-packages -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true \
     && find /usr/local/lib/python3.13/site-packages -type d -name "test" -exec rm -rf {} + 2>/dev/null || true \
     && find /usr/local/lib/python3.13/site-packages -type f -name "*.pyi" -delete 2>/dev/null || true \
